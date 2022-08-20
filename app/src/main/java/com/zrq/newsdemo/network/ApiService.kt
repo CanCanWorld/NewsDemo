@@ -6,6 +6,6 @@ import retrofit2.Call
 import retrofit2.http.GET
 
 interface ApiService {
-    @GET("/ncov/index?key=$API_KEY")
+    @GET("/dongman/index?key=$API_KEY")
     fun getNews(): Call<News>
 }

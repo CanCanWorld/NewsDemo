@@ -6,4 +6,8 @@ object Constant {
     const val CODE = 200
 
     const val SUCCESS = "success"
+
+    const val GET_NEWS = "/dongman/index?key=$API_KEY\""
+
+    const val BASE_URL = "http://api.tianapi.com"
 }
