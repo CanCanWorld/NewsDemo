@@ -7,7 +7,9 @@ object Constant {
 
     const val SUCCESS = "success"
 
-    const val GET_NEWS = "/dongman/index?key=$API_KEY\""
+    const val GET_NEWS = "/dongman/index?key=$API_KEY"
 
     const val BASE_URL = "http://api.tianapi.com"
+
+    const val NUM = 10
 }
