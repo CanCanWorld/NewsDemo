@@ -1,6 +1,5 @@
 package com.zrq.newsdemo
 
-import android.annotation.SuppressLint
 import android.content.Intent
 import android.os.*
 import android.transition.AutoTransition
@@ -14,7 +13,6 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.google.gson.Gson
-import com.google.gson.JsonObject
 import com.zrq.newsdemo.bean.News
 import com.zrq.newsdemo.bean.NewslistItem
 import com.zrq.newsdemo.databinding.ActivityMainBinding
@@ -24,7 +22,6 @@ import com.zrq.newsdemo.utils.Constant.GET_NEWS
 import com.zrq.newsdemo.utils.Constant.SUCCESS
 import kotlinx.android.synthetic.main.activity_main.*
 import okhttp3.*
-import org.json.JSONObject
 import java.io.IOException
 
 class MainActivity : AppCompatActivity() {
@@ -32,14 +29,19 @@ class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
     private var newsList = mutableListOf<NewslistItem>()
     private lateinit var adapter: Adapter<NewslistItem, ItemNewsBinding>
-    private val TAG = "MainActivity"
     private lateinit var autoTransition: AutoTransition
     private var page: Int = 1
+    private lateinit var word: String
     private var isSearch = false
     private var handler = Handler(Looper.myLooper()!!) { msg ->
         if (msg.what == 1)
             adapter.addNews(newsList)
         true
+    }
+    private lateinit var inputMethodManager: InputMethodManager
+
+    companion object {
+        const val TAG = "MainActivity"
     }
 
     @RequiresApi(Build.VERSION_CODES.O)
@@ -51,9 +53,9 @@ class MainActivity : AppCompatActivity() {
         getNewList()
     }
 
-    @RequiresApi(Build.VERSION_CODES.O)
-    @SuppressLint("ClickableViewAccessibility")
     private fun initData() {
+        inputMethodManager =
+            getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
         binding.recyclerView.also {
             it.adapter = Adapter(
                 { view, _, data ->
@@ -90,42 +92,50 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
             })
+            it.addOnScrollListener(object : RecyclerView.OnScrollListener() {
+                override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
+                    if (newState == RecyclerView.SCROLL_STATE_DRAGGING) {
+                        closeSearch()
+                    }
+                }
+            })
         }
         iv_search.setOnClickListener {
-            if (!isSearch) {
-                isSearch = true
-                et_search.visibility = View.VISIBLE
-                iv_close.visibility = View.VISIBLE
-                et_search.hint = "请输入关键字"
-                rl_search.layoutParams.apply {
-                    width = dip2px(px2dip(width) + 200)
-                }
-                rl_search.setPadding(14, 0, 14, 0)
-                et_search.setOnTouchListener { _, _ ->
-                    et_search.visibility = View.VISIBLE
-//                    et_search.focusable = View.FOCUSABLE
-//                    et_search.isFocusableInTouchMode = true
-                    false
-                }
-                beginDelayedTransition()
-            }
+            showSearch()
         }
         iv_close.setOnClickListener {
-            if (isSearch) {
-                isSearch = false
-                et_search.visibility = View.VISIBLE
-                iv_close.visibility = View.GONE
-                et_search.setText("")
-                et_search.hint = ""
-                rl_search.layoutParams.apply {
-                    width = dip2px(48)
-                    height = dip2px(48)
-                }
-                val inputMethodManager =
-                    getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
-                inputMethodManager.hideSoftInputFromWindow(window.decorView.windowToken, 0)
-                beginDelayedTransition()
+            closeSearch()
+        }
+    }
+
+    private fun showSearch() {
+        if (!isSearch) {
+            isSearch = true
+            et_search.visibility = View.VISIBLE
+            iv_close.visibility = View.VISIBLE
+            et_search.hint = "请输入关键字"
+            rl_search.layoutParams.apply {
+                width = dip2px(px2dip(width) + 300)
             }
+            rl_search.setPadding(14, 0, 14, 0)
+            et_search.visibility = View.VISIBLE
+            beginDelayedTransition()
+        }
+    }
+
+    private fun closeSearch() {
+        if (isSearch) {
+            isSearch = false
+            et_search.visibility = View.VISIBLE
+            iv_close.visibility = View.GONE
+            et_search.setText("")
+            et_search.hint = ""
+            rl_search.layoutParams.apply {
+                width = dip2px(48)
+                height = dip2px(48)
+            }
+            inputMethodManager.hideSoftInputFromWindow(window.decorView.windowToken, 0)
+            beginDelayedTransition()
         }
     }
 
