@@ -1,43 +1,30 @@
 package com.zrq.newsdemo
 
-import android.content.Intent
 import android.os.*
 import android.transition.AutoTransition
 import android.transition.TransitionManager
-import android.util.Log
+import android.view.KeyEvent
 import android.view.View
 import android.view.inputmethod.InputMethodManager
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
-import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.recyclerview.widget.RecyclerView
-import com.bumptech.glide.Glide
-import com.google.gson.Gson
-import com.zrq.newsdemo.bean.News
-import com.zrq.newsdemo.bean.NewslistItem
 import com.zrq.newsdemo.databinding.ActivityMainBinding
-import com.zrq.newsdemo.databinding.ItemNewsBinding
-import com.zrq.newsdemo.utils.Constant.BASE_URL
-import com.zrq.newsdemo.utils.Constant.GET_NEWS
-import com.zrq.newsdemo.utils.Constant.SUCCESS
+import com.zrq.newsdemo.utils.Constant.GET_ANIM_NEWS
+import com.zrq.newsdemo.utils.Constant.GET_FILM_NEWS
+import com.zrq.newsdemo.utils.Constant.GET_GAME_NEWS
+import com.zrq.newsdemo.utils.Constant.GET_IT_NEWS
+import com.zrq.newsdemo.utils.Constant.GET_PET_NEWS
 import kotlinx.android.synthetic.main.activity_main.*
-import okhttp3.*
-import java.io.IOException
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : AppCompatActivity(), NewsFragment.OnRecyclerViewScroll {
 
     private lateinit var binding: ActivityMainBinding
-    private var newsList = mutableListOf<NewslistItem>()
-    private lateinit var adapter: Adapter<NewslistItem, ItemNewsBinding>
+
+    private var fragmentList = mutableListOf<NewsFragment>()
+    private var tabList = mutableListOf<String>()
     private lateinit var autoTransition: AutoTransition
-    private var page: Int = 1
-    private lateinit var word: String
+    private var word = ""
     private var isSearch = false
-    private var handler = Handler(Looper.myLooper()!!) { msg ->
-        if (msg.what == 1)
-            adapter.addNews(newsList)
-        true
-    }
     private lateinit var inputMethodManager: InputMethodManager
 
     companion object {
@@ -50,56 +37,35 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
         initData()
-        getNewList()
     }
 
     private fun initData() {
         inputMethodManager =
             getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
-        binding.recyclerView.also {
-            it.adapter = Adapter(
-                { view, _, data ->
-                    Log.d("TAG", "initData: $data")
-                    view.apply {
-                        tvTitle.text = data.title
-                        tvTime.text = data.ctime
-                        tvDesc.text = data.description
-                        Glide.with(applicationContext)
-                            .load(data.picUrl)
-                            .into(ivPic)
-                        cardView.setOnClickListener {
-                            startActivity(Intent(this@MainActivity, WebActivity::class.java).apply {
-                                putExtra("url", data.url)
-                            })
-                        }
-                    }
-                },
-                { inflater, parent ->
-                    ItemNewsBinding.inflate(inflater, parent, false)
-                },
-                newsList
-            ).apply {
-                adapter = this
-            }
-            it.layoutManager = LinearLayoutManager(applicationContext)
-            it.addOnScrollListener(object : RecyclerView.OnScrollListener() {
-                override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
-                    super.onScrolled(recyclerView, dx, dy)
-                    if (!it.canScrollVertically(1)) {
-                        page++
-                        getNewList()
-                        Log.d(TAG, "滑动到底部: $page 页")
-                    }
-                }
-            })
-            it.addOnScrollListener(object : RecyclerView.OnScrollListener() {
-                override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
-                    if (newState == RecyclerView.SCROLL_STATE_DRAGGING) {
-                        closeSearch()
-                    }
-                }
-            })
+        fragmentList.apply {
+            add(NewsFragment.newInstance(GET_GAME_NEWS)
+                .apply { setOnRecyclerViewScroll(this@MainActivity) })
+            add(NewsFragment.newInstance(GET_ANIM_NEWS)
+                .apply { setOnRecyclerViewScroll(this@MainActivity) })
+            add(NewsFragment.newInstance(GET_PET_NEWS)
+                .apply { setOnRecyclerViewScroll(this@MainActivity) })
+            add(NewsFragment.newInstance(GET_FILM_NEWS)
+                .apply { setOnRecyclerViewScroll(this@MainActivity) })
+            add(NewsFragment.newInstance(GET_IT_NEWS)
+                .apply { setOnRecyclerViewScroll(this@MainActivity) })
         }
+        tabList.apply {
+            add("游戏")
+            add("动漫")
+            add("宠物")
+            add("影视")
+            add("IT")
+        }
+        binding.viewPager.apply {
+            adapter = FragmentAdapter(supportFragmentManager, fragmentList, tabList)
+            setOnScrollChangeListener { _, _, _, _, _ -> closeSearch() }
+        }
+        binding.tabLayout.setupWithViewPager(binding.viewPager)
         iv_search.setOnClickListener {
             showSearch()
         }
@@ -145,32 +111,15 @@ class MainActivity : AppCompatActivity() {
         TransitionManager.beginDelayedTransition(rl_search, autoTransition)
     }
 
-    private fun getNewList() {
-        val request = Request.Builder()
-            .url("$BASE_URL$GET_NEWS&page=$page")
-            .method("GET", null)
-            .build()
-        OkHttpClient().newCall(request)
-            .enqueue(object : Callback {
-                override fun onFailure(call: Call, e: IOException) {
-                    Log.d(TAG, "NULL")
-                }
-
-                override fun onResponse(call: Call, response: Response) {
-                    val news = Gson().fromJson(response.body()?.string(), News::class.java)
-                    if (news != null) {
-                        if (news.code == 200 && SUCCESS == news.msg) {
-                            if (news.newslist != null) {
-                                newsList = news.newslist
-                                Log.d(TAG, "onResponse: ${newsList.size}")
-                                val message = Message()
-                                message.what = 1
-                                handler.sendMessage(message)
-                            }
-                        }
-                    }
-                }
-            })
+    override fun dispatchKeyEvent(event: KeyEvent?): Boolean {
+        if (event != null) {
+            if (event.keyCode == KeyEvent.KEYCODE_ENTER) {
+                inputMethodManager.hideSoftInputFromWindow(window.decorView.windowToken, 0)
+                word = et_search.text.toString()
+//                getNewList(GET_ANIM_NEWS)
+            }
+        }
+        return super.dispatchKeyEvent(event)
     }
 
     // dp 转 px
@@ -183,5 +132,9 @@ class MainActivity : AppCompatActivity() {
     private fun px2dip(pxValue: Int): Int {
         val scale = resources.displayMetrics.density
         return (pxValue / scale + .5).toInt()
+    }
+
+    override fun scroll() {
+        closeSearch()
     }
 }
